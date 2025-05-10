@@ -30,7 +30,7 @@ import java.util.Properties;
 
 public class ApiDemo {
 
-    private static final Logger logger = LoggerFactory.getLogger(ApiDemo.class);
+    public static final Logger logger = LoggerFactory.getLogger(ApiDemo.class);
 
     public static void main(String[] args) throws IOException {
         HttpServer server = HttpServer.create(new InetSocketAddress(8080), 0);

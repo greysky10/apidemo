@@ -22,6 +22,10 @@ import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.net.InetSocketAddress;
+import java.net.URI;
+import java.net.URLDecoder;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Properties;
 
 public class ApiDemo {
@@ -39,8 +43,23 @@ public class ApiDemo {
     static class HardwareWalletOpenHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
-            if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+            if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
                 exchange.sendResponseHeaders(405, -1);
+                return;
+            }
+
+            Map<String, String> queryParams = parseQuery(exchange.getRequestURI());
+
+            String openId = queryParams.get("openId");
+            String orderId = queryParams.get("orderId");
+
+            if (StringUtils.isBlank(openId) || StringUtils.isBlank(orderId)) {
+                String error = "Missing required parameters: openId or orderId";
+                byte[] errorBytes = error.getBytes();
+                exchange.sendResponseHeaders(400, errorBytes.length);
+                try (OutputStream os = exchange.getResponseBody()) {
+                    os.write(errorBytes);
+                }
                 return;
             }
 
@@ -69,9 +88,9 @@ public class ApiDemo {
                 logger.debug("原始请求报文头: {}", JSON.toJSONString(msgHead));
 
                 HardwareWalletOpenRequest request = new HardwareWalletOpenRequest();
-                request.setPhone("13544441235");
+                request.setPhone(openId); // using openId as phone substitute for now
+                request.setDeviceName("device-" + orderId);
                 request.setAPDURespData("000000230080000000020759273137bdbc52f06dafa969784a579ace6fb3830e929e5a58f5381008e64641203e241944ac1703d94d866a4de86eb7d1ed535b964c1400414721db5223f0a5084736323f");
-                request.setDeviceName("vivo");
                 request.setBusiMainId(msgHead.getPartnerTxSriNo());
                 request.setReqTransTime(SerialNoUtil.getDateTime());
 
@@ -146,6 +165,22 @@ public class ApiDemo {
                     os.write(responseBytes);
                 }
             }
+        }
+
+        private Map<String, String> parseQuery(URI uri) throws UnsupportedEncodingException {
+            Map<String, String> queryPairs = new HashMap<>();
+            String query = uri.getRawQuery();
+            if (query == null) return queryPairs;
+
+            for (String pair : query.split("&")) {
+                int idx = pair.indexOf("=");
+                if (idx > 0 && idx < pair.length() - 1) {
+                    String key = URLDecoder.decode(pair.substring(0, idx), "UTF-8");
+                    String value = URLDecoder.decode(pair.substring(idx + 1), "UTF-8");
+                    queryPairs.put(key, value);
+                }
+            }
+            return queryPairs;
         }
     }
 }
